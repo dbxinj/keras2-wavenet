@@ -17,12 +17,14 @@ Please check out [Horovod for details](https://github.com/uber/horovod)
 
 ## Installation:
 Activate a new python2 virtualenv (recommended):
+
     pip install virtualenv
     mkdir ~/virtualenvs && cd ~/virtualenvs
     virtualenv wavenet
     source wavenet/bin/activate
 
 Clone and install requirements.
+
     cd ~
     git clone https://github.com/imdatsolak/keras2-wavenet.git
     cd wavenet
