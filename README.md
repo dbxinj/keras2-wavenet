@@ -82,9 +82,10 @@ You can, at any time, stop it using CTRL-C.
 ## Note on computational cost:
 The Wavenet model is quite expensive to train and sample from. We can however trade computation cost with accuracy and fidility by lowering the sampling rate, amount of stacks and the amount of channels per layer.
 
-For a downsized model (4000hz vs 16000 sampling rate, 16 filters v/s 256, 2 stacks vs ??):
-- A Tesla K80 needs around ~4 minutes to generate one second of audio.
-- A recent macbook pro needs around ~15 minutes.
+Configuration: 2x GeForce 1080 Ti (11GiB, ~11TFLOPS), Intel Core i7-6950X CPU @ 3.00GHz (Overclocked: 4.2GHz), 128GiB RAM, 1TB NVME SSD
+- Training at 22KHz, about 27 minutes of audio file: 6.5 hrs / epoch
+- Prediction of 5 seconds, @ 22KHz: 11 minutes
+
 Deepmind has reported that generating one second of audio with their model takes about 90 minutes.
 
 ## Disclaimer
