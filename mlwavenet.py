@@ -84,6 +84,8 @@ class MLWaveNet(object):
         self.data_dir = self.config.get('model', 'data_dir')
         self.data_dir_structure = self.config.get('model', 'data_dir_structure')
         self.model_dir = self.config.get('model', 'model_dir')
+        if len(self.model_dir) == 0:
+            self.model_dir = None
         self.sample_rate = self.config.getint('model', 'sample_rate')
         self.debug = self.config.getint('model', 'debug')
         # Training Configuration
@@ -118,14 +120,15 @@ class MLWaveNet(object):
         self.sample_argmax = self.config.getboolean('prediction', 'sample_argmax')
         self.sample_temperature = self.config.getfloat('prediction', 'sample_temperature')
         self.predict_initial_input = self.config.get('prediction', 'initial_input')
+        if len(self.predict_initial_input) == 0:
+            self.predict_initial_input = None
         self.predict_use_softmax_as_input = self.config.getboolean('prediction', 'use_softmax_as_input')
-        self.sample_seed = self.config.getint('prediction', 'sample_seed')
-        if self.sample_seed is None:
-            self.sample_seed = self.seed
-        self.fragment_length = self.initial_fragment_length + self._compute_receptive_field2(self.sample_rate, self.dilation_depth, self.stacks)[0]
-        # Additional Settings
+        self.sample_seed = self.seed
         np.random.seed(self.seed)
         self.rnd = np.random.RandomState(self.seed)
+
+        self.fragment_length = self.initial_fragment_length + self._compute_receptive_field2(self.sample_rate, self.dilation_depth, self.stacks)[0]
+        # Additional Settings
         self.num_gpus = 1
         self.train_rank = 0
         if self.train_multi_gpu:
@@ -408,9 +411,6 @@ class MLWaveNet(object):
         sample_file._file.flush()
 
     def predict(self):
-        np.random.seed(self.sample_seed)
-        self.rnd = np.random.RandomState(self.sample_seed)
-
         self.fragment_length = self._compute_receptive_field()[0]
         last_checkpoint_file, epoch = self._get_checkpoint_file()
 
@@ -423,19 +423,24 @@ class MLWaveNet(object):
         sample_stream = self._make_sample_stream(sample_filename)
 
         self.model = self._build_model()
+        print('Loading model: {}'.format(last_checkpoint_file))
         model_is_loaded, _ = self._load_model_weights(last_checkpoint_file, epoch)
         if model_is_loaded:
             # model.summary()
             if self.predict_initial_input is None:
                 # outputs = list(dataset.one_hot(np.zeros(fragment_length) + nb_output_bins / 2))
                 # Random initial data
-                outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + nb_output_bins / 2))
-            elif self.predict_initial_input != '':
+                print('Initial Input is NONE')
+                outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + self.output_bins / 2))
+            elif self.predict_initial_input != 'test':
                 # Take from provided file
+                print('Initial Input is -{}-'.format(self.predict_initial_input))
+                outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + nb_output_bins / 2))
                 wav = self.dataset.process_wav(self.sample_rate, self.predict_initial_input, self.use_ulaw)
                 outputs = list(self.dataset.one_hot(wav[0:self.fragment_length]))
             else:
                 # Take from test dataset
+                print('Initial Input is test -{}-'.format(self.predict_initial_input))
                 self.data_generators, _ = self._get_generators()
                 outputs = list(self.data_generators['test'].next()[0][-1])
 
