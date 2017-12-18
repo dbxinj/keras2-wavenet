@@ -82,8 +82,8 @@ You can, at any time, stop it using CTRL-C.
 ## Note on computational cost:
 The Wavenet model is quite expensive to train and sample from. We can however trade computation cost with accuracy and fidility by lowering the sampling rate, amount of stacks and the amount of channels per layer.
 
-Configuration: 2x GeForce 1080 Ti (11GiB, ~11TFLOPS), Intel Core i7-6950X CPU @ 3.00GHz (Overclocked: 4.2GHz), 128GiB RAM, 1TB NVME SSD
-- Training at 22KHz, about 27 minutes of audio file: 6.5 hrs / epoch
+Configuration: 2x GeForce 1080 Ti (each: 11GiB and ~11TFLOPS), Intel Core i7-6950X CPU @ 3.00GHz (Overclocked: 4.2GHz), 128GiB RAM, 1TB NVME SSD
+- Training at 22KHz, about 27 minutes of audio files: 6.5 hrs / epoch
 - Prediction of 5 seconds, @ 22KHz: 11 minutes
 
 Deepmind has reported that generating one second of audio with their model takes about 90 minutes.
