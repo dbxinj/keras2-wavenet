@@ -3,7 +3,7 @@ Based on https://deepmind.com/blog/wavenet-generative-model-raw-audio/ and https
 
 This is the based on [Keras WaveNet implementation](https://github.com/basveeling/wavenet/) for Keras 2 and Tensorflow.
 
-I have also added a wavenet_mgpu.py to train on multiple GPUs using Horovod, but this has not been fully tested yet, but it seems to work, though there is currently *no support* for predicting with multiple GPUs. I may add it over time...
+I'm currently working on making the single ```mlwavenet.py``` multi-GPU-capable using Horovod, but this has not been fully tested yet, but it seems to work, though there is currently *no support* for predicting with multiple GPUs. I may add it over time...
 
 I use the following command to train on my DUAL-GPU (NVidia GeForce 1080 Ti) using Horovod & OpenMPI:
     
