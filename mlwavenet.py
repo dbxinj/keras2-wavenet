@@ -118,7 +118,7 @@ class MLWaveNet(object):
         self.sample_argmax = self.config.getboolean('prediction', 'sample_argmax')
         self.sample_temperature = self.config.getfloat('prediction', 'sample_temperature')
         self.predict_initial_input = self.config.get('prediction', 'initial_input')
-        self.predict_use_softmax_as_input = self.config.get('prediction', 'use_softmax_as_input')
+        self.predict_use_softmax_as_input = self.config.getboolean('prediction', 'use_softmax_as_input')
         self.sample_seed = self.config.getint('prediction', 'sample_seed')
         if self.sample_seed is None:
             self.sample_seed = self.seed
