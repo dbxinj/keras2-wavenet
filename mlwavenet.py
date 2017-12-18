@@ -376,7 +376,7 @@ class MLWaveNet(object):
         e_x = np.exp(x - np.max(x, axis=-1))
         return e_x / np.sum(e_x, axis=-1)
 
-    def draw_sample(self, output_dist):
+    def _draw_sample(self, output_dist):
         if self.sample_argmax:
             output_dist = np.eye(256)[np.argmax(output_dist, axis=-1)]
         else:
@@ -443,7 +443,7 @@ class MLWaveNet(object):
                 prediction_seed = np.expand_dims(np.array(outputs[:self.fragment_length]), 0)
                 output = self.model.predict(prediction_seed)
                 output_dist = output[0][-1]
-                output_val = self.draw_sample(output_dist)
+                output_val = self._draw_sample(output_dist)
                 if self.predict_use_softmax_as_input:
                     outputs.append(output_dist)
                 else:
