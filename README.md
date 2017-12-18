@@ -31,7 +31,7 @@ Clone and install requirements.
     pip install -r requirements.txt
 
 ## Dependencies:
-- This implementation does not support python3 as of now.
+This implementation does not support python3 as of now.
 
 ## Sampling:
 Once the first model checkpoint is created, you can start sampling.
@@ -52,13 +52,13 @@ You can either define the sample_length in settings-file or provide it as parame
 
 e.g.:
 
-    $ python2 mlwavenet.py -c <settings-file> -C predict -l 10
+    $ python2 mlwavenet.py -c <settings-file> -C predict -l 5
 
 ## Training:
 
 For training, you now need to create a ```configuration-file```. The file is the Windows(r) .ini file-format. An example is provided.
 
-The default setting is fine. You can immediately start training with it. The settings are for 16KHz-training.
+The default setting is fine. You can immediately start training with it. The settings are for 4.4KHz-training.
 
     $ python mlwavenet.py -c settings.ini -C train
 
