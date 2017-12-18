@@ -14,6 +14,7 @@ import scipy.io.wavfile
 import scipy.signal
 import getopt
 import ConfigParser
+import codecs
 from keras import layers
 from keras import metrics
 from keras import objectives
@@ -65,7 +66,7 @@ Updated: 2017-12-07 - 2017-12-18, Imdat Solak (ISO)
 """
 
 class MLWaveNet(object):
-    def __init__(self, config_file, resume_training=True, resume_epoch=None):
+    def __init__(self, config_file, resume_training=True, resume_epoch=None, predict_length=None):
         self.config = ConfigParser.ConfigParser(allow_no_value=True)
         try:
             self.config.readfp(open(config_file))
@@ -110,10 +111,14 @@ class MLWaveNet(object):
         self.train_multi_gpu = self.config.getboolean('training', 'multi_gpu')
         self.early_stopping_patience = self.config.getint('training', 'early_stopping_patience')
         # Prediction Configuration
-        self.predict_length = self.config.getint('prediction', 'predict_length')
+        self.predict_length = self.config.getfloat('prediction', 'predict_length')
+        # Let's allow the user to overwrite the length via cmd-line, it is more practical :-)
+        if predict_length is not None:
+            self.predict_length = predict_length
         self.sample_argmax = self.config.getboolean('prediction', 'sample_argmax')
         self.sample_temperature = self.config.getfloat('prediction', 'sample_temperature')
         self.predict_initial_input = self.config.get('prediction', 'initial_input')
+        self.predict_use_softmax_as_input = self.config.get('prediction', 'use_softmax_as_input')
         self.sample_seed = self.config.getint('prediction', 'sample_seed')
         if self.sample_seed is None:
             self.sample_seed = self.seed
@@ -216,9 +221,10 @@ class MLWaveNet(object):
             checkpoint_file  = os.path.join(self.model_dir, 'checkpoints', 'checkpoint.{:05d}.hdf5'.format(checkpoint_no))
         else:
             history_file = os.path.join(self.model_dir, 'history.csv')
+            print('Reading history... {}'.format(history_file))
             try:
                 history = codecs.open(history_file, 'r', 'utf-8').readlines()
-                checkpoint_no = int(history[-1].strip().split()[0]) + 1
+                checkpoint_no = int(history[-1].strip().split(',')[0]) + 1
             except:
                 checkpoint_no = 0
             checkpoint_file  = os.path.join(self.model_dir, 'checkpoints', 'checkpoint.{:05d}.hdf5'.format(checkpoint_no))
@@ -365,8 +371,8 @@ class MLWaveNet(object):
         sample_file.setsampwidth(1)
         return sample_file
 
-    def _softmax(self, x, temp):
-        x = np.log(x) / temp
+    def _softmax(self, x):
+        x = np.log(x) / self.sample_temperature
         e_x = np.exp(x - np.max(x, axis=-1))
         return e_x / np.sum(e_x, axis=-1)
 
@@ -390,7 +396,7 @@ class MLWaveNet(object):
             sample_str += '_sample'
             if self.sample_temperature:
                 sample_str += '-temp-%s' % self.sample_temperature
-        sample_name = 'sample_epoch-%05d_%02ds_%s_seed-%d.wav' % (epoch, int(self.predict_seconds), sample_str, self.sample_seed)
+        sample_name = 'sample_epoch-%05d_%02ds_%s_seed-%d.wav' % (epoch, int(self.predict_length), sample_str, self.sample_seed)
         return sample_name
 
     def _write_samples(self, sample_file, out_val):
@@ -412,9 +418,9 @@ class MLWaveNet(object):
         if not os.path.exists(sample_dir):
             os.mkdir(sample_dir)
 
-        sample_name = make_sample_name(epoch)
+        sample_name = self._make_sample_name(epoch)
         sample_filename = os.path.join(sample_dir, sample_name)
-        sample_stream = self._make_sample_stream(self.sample_rate, sample_filename)
+        sample_stream = self._make_sample_stream(sample_filename)
 
         self.model = self._build_model()
         model_is_loaded, _ = self._load_model_weights(last_checkpoint_file, epoch)
@@ -433,7 +439,7 @@ class MLWaveNet(object):
                 self.data_generators, _ = self._get_generators()
                 outputs = list(self.data_generators['test'].next()[0][-1])
 
-            for i in tqdm(xrange(int(self.sample_rate * self.predict_seconds))):
+            for i in tqdm(xrange(int(self.sample_rate * self.predict_length))):
                 prediction_seed = np.expand_dims(np.array(outputs[:self.fragment_length]), 0)
                 output = self.model.predict(prediction_seed)
                 output_dist = output[0][-1]
@@ -442,7 +448,7 @@ class MLWaveNet(object):
                     outputs.append(output_dist)
                 else:
                     outputs.append(output_val)
-                self.write_samples(sample_stream, [output_val])
+                self._write_samples(sample_stream, [output_val])
                 del outputs[0]
             sample_stream.close()
         else:
@@ -451,13 +457,13 @@ class MLWaveNet(object):
 
 def print_usage():
     print('Usage:')
-    print('\tpython mlwavenet.py -c <config-file> [-C <train|test|predict>] [-r <resume-epoch>] [-R]')
+    print('\tpython mlwavenet.py -c <config-file> [-C <train|test|predict>] [-r <resume-epoch>] [-R] [-l predict_length]')
     sys.exit(1)
 
 
 if __name__ == '__main__':
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:R', ['--config', '--CMD', '--resume', '--restart'])
+        opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:Rl:', ['--config', '--CMD', '--resume', '--restart', '--length'])
     except getopt.GetoptError:
         print_usage()
 
@@ -465,6 +471,7 @@ if __name__ == '__main__':
     command = 'train'
     resume_training = True
     resume_epoch = None
+    predict_length = None
 
     for opt, arg in opts:
         if opt in ('-c', '--config'):
@@ -475,11 +482,13 @@ if __name__ == '__main__':
             resume_epoch = int(arg)
         elif opt in ('-R', '--restart'):
             resume_training = False
+        elif opt in ('-l', '--length'):
+            predict_length = int(arg)
     
     if config_file is None:
         print_usage()
 
-    wavenet = MLWaveNet(config_file, resume_training, resume_epoch)
+    wavenet = MLWaveNet(config_file, resume_training, resume_epoch, predict_length)
     if command == 'train':
         wavenet.train()
     elif command == 'test':

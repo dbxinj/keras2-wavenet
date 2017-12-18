@@ -15,11 +15,6 @@ Please check out [Horovod for details](https://github.com/uber/horovod)
 
 [Listen to a sample 🎶!](http://data.m-ailabs.bayern/data/Samples/Music/)
 
-## Generate your own samples:
-
-    $ python2 mlwavenet.py -c settings.ini
-
-
 ## Installation:
 Activate a new python2 virtualenv (recommended):
     pip install virtualenv
@@ -41,9 +36,10 @@ Once the first model checkpoint is created, you can start sampling.
 
 Run:
 
-    $ python2 mlwavenet.py -c <config-file-used-for-training> -C predict 
+    $ python2 mlwavenet.py -c <config-file-used-for-training> -C predict -l 5
 
 The latest model checkpoint will be retrieved and used to sample. The sample will be streamed to `[model_dir]/samples`, you can start listening when the first sample is generated.
+You can either define the sample_length in settings-file or provide it as parameter (-l) - in seconds
 
 ### Sampling options:
 - `predict_length`: float. Number of seconds to sample (length in seconds).
@@ -54,7 +50,7 @@ The latest model checkpoint will be retrieved and used to sample. The sample wil
 
 e.g.:
 
-    $ python2 mlwavenet.py -c <settings-file> -C predict
+    $ python2 mlwavenet.py -c <settings-file> -C predict -l 10
 
 ## Training:
 
@@ -62,9 +58,11 @@ For training, you now need to create a ```configuration-file```. The file is the
 
 The default setting is fine. You can immediately start training with it. The settings are for 16KHz-training.
 
-    $ python mlwavenet.py -c settings.ini 
+    $ python mlwavenet.py -c settings.ini -C train
 
-You can, at any time, stop it using CTRL-C. If you use the same settings-file, it will continue training if you restart it.
+If you don't provide a '-C' command-line option at all, it is assumed to be 'train'. Normally, it will automatically resume training at the last epoch if the settings-file is the same. If you want to re-start training, you can either provide '-R' (reset) or delete the models-directory.
+
+You can, at any time, stop it using CTRL-C.
 
 ## Using your own training data:
 - Create a new data directory with a train and test folder in it. All wave files in these folders will be used as data.

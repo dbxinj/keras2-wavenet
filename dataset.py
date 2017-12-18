@@ -171,7 +171,7 @@ class DataSet(object):
         x /= ((max_value - min_value) / 2.)
         x -= 1.
         x = np.sign(x) * (1 / u) * (((1 + u) ** np.abs(x)) - 1)
-        x = float_to_uint8(x)
+        x = self.float_to_uint8(x)
         return x
 
     def ensure_sample_rate(self, file_sample_rate, mono_audio):
