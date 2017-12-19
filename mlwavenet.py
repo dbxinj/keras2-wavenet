@@ -55,8 +55,8 @@ if __name__ == '__main__':
         elif opt in ('-m', '--mgpu'):
             multi_gpu = True
     if multi_gpu:
-        import horovod.keras as hvd
         import tensorflow as tf
+        import horovod.keras as hvd
 
         hvd.init()
         config = tf.ConfigProto()

@@ -7,9 +7,11 @@ I'm currently working on making the single ```mlwavenet.py``` multi-GPU-capable 
 
 I use the following command to train on my DUAL-GPU (NVidia GeForce 1080 Ti) using Horovod & OpenMPI:
     
-    /usr/local/bin/mpirun -np 2 -H localhost:2 -bind-to none -map-by slot -x NCCL_DEBUG=INFO -x LD_LIBRARY_PATH -mca btl_tcp_if_exclude eno1 python mlwavenet.py -c multi_gpu_settings.ini
+    /usr/local/bin/mpirun -np 2 -H localhost:2 -bind-to none -map-by slot -x NCCL_DEBUG=INFO -x LD_LIBRARY_PATH -mca btl_tcp_if_exclude eno1 python mlwavenet.py -c multi_gpu_settings.ini -m
 
 The ``-mca btl_tcp_if_exclude eno1`` just means that OpenMPI should not listen on that interface as that one is not configured on my machine...
+
+The parameter  ``-m`` is important as it tells ``mlwavenet.py`` that it will be running in the multi-GPU mode!
 
 Please check out [Horovod for details](https://github.com/uber/horovod)
 
