@@ -28,6 +28,42 @@ from tqdm import tqdm
 from dataset import DataSet
 import dataset
 from wavenet_utils import CausalDilatedConv1D, categorical_mean_squared_error
+if __name__ == '__main__':
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:Rl:m', ['--config', '--CMD', '--resume', '--restart', '--length', '--mgpu'])
+    except getopt.GetoptError:
+        print_usage()
+
+    config_file = None
+    command = 'train'
+    resume_training = True
+    resume_epoch = None
+    predict_length = None
+    multi_gpu = False
+
+    for opt, arg in opts:
+        if opt in ('-c', '--config'):
+            config_file = arg
+        elif opt in ('-C', '--CMD'):
+            command = arg
+        elif opt in ('-r', '--resume'):
+            resume_epoch = int(arg)
+        elif opt in ('-R', '--restart'):
+            resume_training = False
+        elif opt in ('-l', '--length'):
+            predict_length = int(arg)
+        elif opt in ('-m', '--mgpu'):
+            multi_gpu = True
+    if multi_gpu:
+        import horovod.keras as hvd
+        import tensorflow as tf
+
+        hvd.init()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.gpu_options.visible_device_list = str(hvd.local_rank())
+        K.set_session(tf.Session(config=config))
+
 """
 Keras2 based WaveNet
 
@@ -66,7 +102,7 @@ Updated: 2017-12-07 - 2017-12-18, Imdat Solak (ISO)
 """
 
 class MLWaveNet(object):
-    def __init__(self, config_file, resume_training=True, resume_epoch=None, predict_length=None):
+    def __init__(self, config_file, resume_training=True, resume_epoch=None, predict_length=None, multi_gpu=False):
         self.config = ConfigParser.ConfigParser(allow_no_value=True)
         try:
             self.config.readfp(open(config_file))
@@ -74,6 +110,7 @@ class MLWaveNet(object):
             print('Could not read configuration file {} - exiting.'.format(config_file))
             sys.exit(1)
         # Get General Configuration
+        self.train_multi_gpu = multi_gpu
         self.resume_training = resume_training
         self.resume_epoch = resume_epoch
         self.keras_verbose = self.config.getint('general', 'keras_verbose')
@@ -110,7 +147,6 @@ class MLWaveNet(object):
         self.train_with_soft_targets = self.config.getboolean('training', 'train_with_soft_targets')
         self.soft_target_stdev = self.config.getfloat('training', 'soft_target_stdev')
         self.optimizer = self.config.get('training', 'optimizer')
-        self.train_multi_gpu = self.config.getboolean('training', 'multi_gpu')
         self.early_stopping_patience = self.config.getint('training', 'early_stopping_patience')
         # Prediction Configuration
         self.predict_length = self.config.getfloat('prediction', 'predict_length')
@@ -132,14 +168,9 @@ class MLWaveNet(object):
         self.num_gpus = 1
         self.train_rank = 0
         if self.train_multi_gpu:
-            import horovod.keras as hvd
-            hvd.init()
-            config = tf.ConfigProto()
-            config.gpu_options.allow_growth = True
-            config.gpu_options.visible_device_list = str(hvd.local_rank())
-            K.set_session(tf.Session(config=config))
             self.train_rank = hvd.rank()
             self.num_gpus = hvd.size()
+        print('rank = {}, num_gpu={}'.format(self.train_rank, self.num_gpus))
         self.dataset = DataSet(self.config, self.fragment_length, self.num_gpus, self.train_rank)
 
     # ################################################################################################## 
@@ -346,15 +377,16 @@ class MLWaveNet(object):
         if self.train_rank == 0:
             callbacks.extend([
                         ModelCheckpoint(os.path.join(self.checkpoint_dir, 'checkpoint.{epoch:05d}.hdf5'), save_best_only=True),
-                        CSVLogger(os.path.join(self.model_dir, 'history.csv'))
+                        CSVLogger(os.path.join(self.model_dir, 'history.csv'), append=True)
                     ])
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
 
-        print('Starting Training...')
         keras_verbose = self.keras_verbose
         if self.train_rank > 0:
             keras_verbose = 0
+        else:
+            print('Starting Training...')
         self.model.fit_generator(self.data_generators['train'],
                             self.nb_examples['train'] // self.num_gpus,
                             initial_epoch=self.initial_epoch,
@@ -466,34 +498,11 @@ def print_usage():
     sys.exit(1)
 
 
-if __name__ == '__main__':
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:Rl:', ['--config', '--CMD', '--resume', '--restart', '--length'])
-    except getopt.GetoptError:
-        print_usage()
-
-    config_file = None
-    command = 'train'
-    resume_training = True
-    resume_epoch = None
-    predict_length = None
-
-    for opt, arg in opts:
-        if opt in ('-c', '--config'):
-            config_file = arg
-        elif opt in ('-C', '--CMD'):
-            command = arg
-        elif opt in ('-r', '--resume'):
-            resume_epoch = int(arg)
-        elif opt in ('-R', '--restart'):
-            resume_training = False
-        elif opt in ('-l', '--length'):
-            predict_length = int(arg)
-    
+if __name__ == '__main__': 
     if config_file is None:
         print_usage()
 
-    wavenet = MLWaveNet(config_file, resume_training, resume_epoch, predict_length)
+    wavenet = MLWaveNet(config_file, resume_training, resume_epoch, predict_length, multi_gpu)
     if command == 'train':
         wavenet.train()
     elif command == 'test':

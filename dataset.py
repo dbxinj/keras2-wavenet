@@ -43,7 +43,6 @@ class DataSet(object):
         self.train_with_soft_targets = configuration.getboolean('training', 'train_with_soft_targets')
         self.soft_target_stdev = configuration.getfloat('training', 'soft_target_stdev')
         self.optimizer = configuration.get('training', 'optimizer')
-        self.train_multi_gpu = configuration.getboolean('training', 'multi_gpu')
         self.early_stopping_patience = configuration.getint('training', 'early_stopping_patience')
         # Prediction Configuration
         self.predict_length = configuration.getint('prediction', 'predict_length')
@@ -78,7 +77,6 @@ class DataSet(object):
         batches_parted = [batch for batch in partition_all(self.batch_size, indices)]
         start_index = len(batches_parted) // self.num_gpus * self.train_rank
         batches_gpu = batches_parted[start_index:]
-
         batches = cycle(batches_gpu)
         for batch in batches:
             if len(batch) < self.batch_size:
