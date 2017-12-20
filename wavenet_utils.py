@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from __future__ import print_function
 import keras.backend as K
 from keras.layers import Conv1D
@@ -8,8 +7,7 @@ from keras.utils.conv_utils import conv_output_length
 
 def categorical_mean_squared_error(y_true, y_pred):
     """MSE for categorical variables."""
-    return K.mean(K.square(K.argmax(y_true, axis=-1) -
-                           K.argmax(y_pred, axis=-1)))
+    return K.mean(K.square(K.argmax(y_true, axis=-1) - K.argmax(y_pred, axis=-1)))
 
 class CausalDilatedConv1D(Conv1D):
     def __init__(self, nb_filter, filter_length, init='glorot_uniform', activation=None, weights=None,
@@ -30,16 +28,9 @@ class CausalDilatedConv1D(Conv1D):
 
     def compute_output_shape(self, input_shape):
         input_length = input_shape[1]
-
         if self.causal:
             input_length += self.atrous_rate * (self.filter_length - 1)
-
-        length = conv_output_length(input_length,
-                                    self.filter_length,
-                                    self.border_mode,
-                                    self.strides[0],
-                                    dilation=self.atrous_rate)
-
+        length = conv_output_length(input_length, self.filter_length, self.border_mode, self.strides[0], dilation=self.atrous_rate)
         return (input_shape[0], length, self.nb_filter)
 
     def call(self, x, mask=None):
