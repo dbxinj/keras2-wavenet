@@ -30,7 +30,7 @@ import dataset
 from wavenet_utils import CausalDilatedConv1D, categorical_mean_squared_error
 if __name__ == '__main__':
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:Rl:m', ['--config', '--CMD', '--resume', '--restart', '--length', '--mgpu'])
+        opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:Rl:me:', ['--config', '--CMD', '--resume', '--restart', '--length', '--mgpu', '--epoch'])
     except getopt.GetoptError:
         print_usage()
 
@@ -40,6 +40,7 @@ if __name__ == '__main__':
     resume_epoch = None
     predict_length = None
     multi_gpu = False
+    epoch = None
 
     for opt, arg in opts:
         if opt in ('-c', '--config'):
@@ -54,6 +55,9 @@ if __name__ == '__main__':
             predict_length = int(arg)
         elif opt in ('-m', '--mgpu'):
             multi_gpu = True
+        elif opt in ('-e', '--epoch'):
+            epoch = int(arg)
+
     if multi_gpu:
         import tensorflow as tf
         import horovod.keras as hvd
@@ -61,6 +65,7 @@ if __name__ == '__main__':
         hvd.init()
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
+        print('hdv.local_rank: ', hvd.local_rank())
         config.gpu_options.visible_device_list = str(hvd.local_rank())
         K.set_session(tf.Session(config=config))
 
@@ -376,7 +381,7 @@ class MLWaveNet(object):
         ])
         if self.train_rank == 0:
             callbacks.extend([
-                        ModelCheckpoint(os.path.join(self.checkpoint_dir, 'checkpoint.{epoch:05d}.hdf5'), save_best_only=True),
+                        ModelCheckpoint(os.path.join(self.checkpoint_dir, 'checkpoint.{epoch:05d}.hdf5'), save_best_only=False),
                         CSVLogger(os.path.join(self.model_dir, 'history.csv'), append=True)
                     ])
         if not os.path.exists(self.checkpoint_dir):
@@ -442,9 +447,9 @@ class MLWaveNet(object):
         sample_file.writeframes(s)
         sample_file._file.flush()
 
-    def predict(self):
+    def predict(self, epoch=None):
         self.fragment_length = self._compute_receptive_field()[0]
-        last_checkpoint_file, epoch = self._get_checkpoint_file()
+        last_checkpoint_file, epoch = self._get_checkpoint_file(epoch)
 
         sample_dir = os.path.join(self.model_dir, 'samples')
         if not os.path.exists(sample_dir):
@@ -459,15 +464,18 @@ class MLWaveNet(object):
         model_is_loaded, _ = self._load_model_weights(last_checkpoint_file, epoch)
         if model_is_loaded:
             # model.summary()
-            if self.predict_initial_input is None:
-                # outputs = list(dataset.one_hot(np.zeros(fragment_length) + nb_output_bins / 2))
+            if self.predict_initial_input is None or self.predict_initial_input == 'random':
                 # Random initial data
-                print('Initial Input is NONE')
+                print('RANDOM initial input')
                 outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + self.output_bins / 2))
+            elif self.predict_initial_input == 'zero':
+                # zero initial input
+                print('ZERO initial input')
+                outputs = list(self.dataset.one_hot(np.zeros(self.fragment_length) + self.output_bins / 2))
             elif self.predict_initial_input != 'test':
                 # Take from provided file
                 print('Initial Input is -{}-'.format(self.predict_initial_input))
-                outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + nb_output_bins / 2))
+                outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + self.output_bins / 2))
                 wav = self.dataset.process_wav(self.sample_rate, self.predict_initial_input, self.use_ulaw)
                 outputs = list(self.dataset.one_hot(wav[0:self.fragment_length]))
             else:
@@ -494,7 +502,7 @@ class MLWaveNet(object):
 
 def print_usage():
     print('Usage:')
-    print('\tpython mlwavenet.py -c <config-file> [-C <train|test|predict>] [-r <resume-epoch>] [-R] [-l predict_length]')
+    print('\tpython mlwavenet.py -c <config-file> [-C <train|test|predict>] [-r <resume-epoch>] [-R] [-l predict_length] [-e epoch]')
     sys.exit(1)
 
 
@@ -508,7 +516,7 @@ if __name__ == '__main__':
     elif command == 'test':
         pass
     elif command == 'predict':
-        wavenet.predict()
+        wavenet.predict(epoch)
     else:
         print('Unknown command <{}>.'.format(command))
         print_usage()
