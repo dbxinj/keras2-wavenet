@@ -476,7 +476,7 @@ class MLWaveNet(object):
                 # Take from provided file
                 print('Initial Input is -{}-'.format(self.predict_initial_input))
                 outputs = list(self.dataset.one_hot(np.random.randn(self.fragment_length) + self.output_bins / 2))
-                wav = self.dataset.process_wav(self.sample_rate, self.predict_initial_input, self.use_ulaw)
+                wav = self.dataset.process_wav(self.predict_initial_input)
                 outputs = list(self.dataset.one_hot(wav[0:self.fragment_length]))
             else:
                 # Take from test dataset
