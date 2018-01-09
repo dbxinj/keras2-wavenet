@@ -45,6 +45,10 @@ Run:
 The latest model checkpoint will be retrieved and used to sample. The sample will be streamed to `[model_dir]/samples`, you can start listening when the first sample is generated.
 You can either define the sample_length in settings-file or provide it as parameter (-l) - in seconds
 
+Alternatively, you can specify an epoch to use for generating audio:
+    
+    $ python2 mlwavenet.py -c <config-file> -C predict -l <duration-seconds> -e <epoch-no>
+
 ### Sampling options:
 - `predict_length`: float. Number of seconds to sample (length in seconds).
 - `sample_argmax`: `True` or `False`. Always take the argmax
