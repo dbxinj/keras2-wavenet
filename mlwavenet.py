@@ -160,6 +160,8 @@ class MLWaveNet(object):
             self.predict_length = predict_length
         self.sample_argmax = self.config.getboolean('prediction', 'sample_argmax')
         self.sample_temperature = self.config.getfloat('prediction', 'sample_temperature')
+        if self.sample_temperature < 0.01:
+            self.sample_temperature = None
         self.predict_initial_input = self.config.get('prediction', 'initial_input')
         if len(self.predict_initial_input) == 0:
             self.predict_initial_input = None
@@ -288,7 +290,7 @@ class MLWaveNet(object):
         self.receptive_field, _ = self._compute_receptive_field()
         n_outputs = self.fragment_length - self.receptive_field + 1
         # Make a gaussian kernel.
-        kernel_v = scipy.signal.gaussian(9, std=selfsoft_target_stdev)
+        kernel_v = scipy.signal.gaussian(9, std=self.soft_target_stdev)
         # print(kernel_v)
         kernel_v = np.reshape(kernel_v, [1, 1, -1, 1])
         kernel = K.variable(kernel_v)
