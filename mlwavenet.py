@@ -17,6 +17,7 @@ import ConfigParser
 import codecs
 from keras import layers
 from keras import metrics
+import keras.utils as KU
 from keras import objectives
 from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, CSVLogger
 from keras.engine import Input
@@ -160,8 +161,6 @@ class MLWaveNet(object):
             self.predict_length = predict_length
         self.sample_argmax = self.config.getboolean('prediction', 'sample_argmax')
         self.sample_temperature = self.config.getfloat('prediction', 'sample_temperature')
-        if self.sample_temperature < 0.01:
-            self.sample_temperature = None
         self.predict_initial_input = self.config.get('prediction', 'initial_input')
         if len(self.predict_initial_input) == 0:
             self.predict_initial_input = None
@@ -465,7 +464,9 @@ class MLWaveNet(object):
         print('Loading model: {}'.format(last_checkpoint_file))
         model_is_loaded, _ = self._load_model_weights(last_checkpoint_file, epoch)
         if model_is_loaded:
-            # model.summary()
+            # KU.print_summary(self.model, line_length=200)
+            # KU.plot_model(self.model, to_file='plot.png', show_shapes=True)
+
             if self.predict_initial_input is None or self.predict_initial_input == 'random':
                 # Random initial data
                 print('RANDOM initial input')
