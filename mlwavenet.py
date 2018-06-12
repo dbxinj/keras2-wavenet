@@ -28,7 +28,14 @@ from tqdm import tqdm
 from dataset import DataSet
 import dataset
 from wavenet_utils import CausalDilatedConv1D, categorical_mean_squared_error
+
+import tensorflow as tf
+
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'c:C:r:Rl:me:', ['--config', '--CMD', '--resume', '--restart', '--length', '--mgpu', '--epoch'])
     except getopt.GetoptError:
@@ -194,8 +201,10 @@ class MLWaveNet(object):
         receptive_field, _ = self._compute_receptive_field()
 
         def wrapper(y_true, y_pred):
-            y_true = y_true[:, receptive_field - 1:, :]
-            y_pred = y_pred[:, receptive_field - 1:, :]
+            y_true = y_true[:, int(receptive_field / 2): -int(receptive_field / 2), :]
+            y_pred = y_pred[:, int(receptive_field / 2): -int(receptive_field / 2), :]
+            #y_true = y_true[:, receptive_field - 1:, :]
+            #y_pred = y_pred[:, receptive_field - 1:, :]
             return func(y_true, y_pred)
 
         wrapper.__name__ = func.__name__
@@ -218,8 +227,10 @@ class MLWaveNet(object):
     def _build_model_residual_block(self, x, i, s):
         original_x = x
         # TODO: initalization, regularization?
-        tanh_out = CausalDilatedConv1D(self.filters, 2, atrous_rate=2 ** i, border_mode='valid', causal=True, bias=self.use_bias, name='dilated_conv_%d_tanh_s%d' % (2 ** i, s), activation='tanh', W_regularizer=l2(self.res_l2))(x)
-        sigm_out = CausalDilatedConv1D(self.filters, 2, atrous_rate=2 ** i, border_mode='valid', causal=True, bias=self.use_bias, name='dilated_conv_%d_sigm_s%d' % (2 ** i, s), activation='sigmoid', W_regularizer=l2(self.res_l2))(x)
+        tanh_out = layers.Conv1D(self.filters, 2, dilation_rate=2 ** i, padding='same', use_bias=self.use_bias, name='dilated_conv_%d_tanh_s%d' % (2 ** i, s), activation='tanh', kernel_regularizer=l2(self.res_l2))(x)
+        sigm_out = layers.Conv1D(self.filters, 2, dilation_rate=2 ** i, padding='same', use_bias=self.use_bias, name='dilated_conv_%d_sigm_s%d' % (2 ** i, s), activation='sigmoid', kernel_regularizer=l2(self.res_l2))(x)
+        '''tanh_out = CausalDilatedConv1D(self.filters, 2, atrous_rate=2 ** i, border_mode='valid', causal=True, bias=self.use_bias, name='dilated_conv_%d_tanh_s%d' % (2 ** i, s), activation='tanh', W_regularizer=l2(self.res_l2))(x)
+        sigm_out = CausalDilatedConv1D(self.filters, 2, atrous_rate=2 ** i, border_mode='valid', causal=True, bias=self.use_bias, name='dilated_conv_%d_sigm_s%d' % (2 ** i, s), activation='sigmoid', W_regularizer=l2(self.res_l2))(x)'''
         x = layers.Multiply()([tanh_out, sigm_out])
 
         res_x = layers.Conv1D(self.filters, 1, padding='same', use_bias=self.use_bias, kernel_regularizer=l2(self.res_l2))(x)
@@ -231,7 +242,8 @@ class MLWaveNet(object):
         input_shape = Input(shape=(self.fragment_length, self.output_bins), name='input_part')
         out = input_shape
         skip_connections = []
-        out = CausalDilatedConv1D(self.filters, 2, atrous_rate=1, border_mode='valid', causal=True, name='initial_causal_conv')(out)
+        out = layers.Conv1D(self.filters, 2, dilation_rate=1, padding='same', name='initial_causal_conv')(out)
+        #out = CausalDilatedConv1D(self.filters, 2, atrous_rate=1, border_mode='valid', causal=True, name='initial_causal_conv')(out)
         for s in range(self.stacks):
             for i in range(0, self.dilation_depth + 1):
                 out, skip_out = self._build_model_residual_block(out, i, s)
@@ -392,6 +404,7 @@ class MLWaveNet(object):
             keras_verbose = 0
         else:
             print('Starting Training...')
+        print(self.nb_examples['train'], self.nb_examples['test'], self.num_gpus)
         self.model.fit_generator(self.data_generators['train'],
                             self.nb_examples['train'] // self.num_gpus,
                             initial_epoch=self.initial_epoch,

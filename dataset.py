@@ -62,14 +62,14 @@ class DataSet(object):
             for i in xrange(0, sequence.shape[0] - self.fragment_length, self.fragment_stride):
                 yield seq_i, i
 
-    def select_generator(self, set_name, full_sequences, rnd):
+    def select_generator(self, set_name, full_sequences, full_labels, rnd):
         if self.random_train_batches and set_name == 'train':
             bg = self.random_batch_generator
         else:
             bg = self.batch_generator
-        return bg(full_sequences, rnd)
+        return bg(full_sequences, full_labels, rnd)
 
-    def batch_generator(self, full_sequences, rnd):
+    def batch_generator(self, full_sequences, full_labels, rnd):
         indices = list(self.fragment_indices(full_sequences))
         if self.randomize_batch_order:
             rnd.shuffle(indices)
@@ -83,9 +83,9 @@ class DataSet(object):
                 continue
             yield np.array(
                 [self.one_hot(full_sequences[e[0]][e[1]:e[1] + self.fragment_length]) for e in batch], dtype='uint8'), np.array(
-                [self.one_hot(full_sequences[e[0]][e[1] + 1:e[1] + self.fragment_length + 1]) for e in batch], dtype='uint8')
+                [self.one_hot(full_labels[e[0]][e[1]:e[1] + self.fragment_length]) for e in batch], dtype='uint8')
 
-    def random_batch_generator(self, full_sequences, rnd):
+    def random_batch_generator(self, full_sequences, full_labels, rnd):
         lengths = [x.shape[0] for x in full_sequences]
         nb_sequences = len(full_sequences)
         while True:
@@ -96,7 +96,7 @@ class DataSet(object):
                 l = lengths[seq_i]
                 offset = np.squeeze(rnd.randint(0, l - fragment_length, 1))
                 batch_inputs.append(full_sequences[seq_i][offset:offset + self.fragment_length])
-                batch_outputs.append(full_sequences[seq_i][offset + 1:offset + self.fragment_length + 1])
+                batch_outputs.append(full_labels[seq_i][offset:offset + self.fragment_length])
             yield self.one_hot(np.array(batch_inputs, dtype='uint8')), self.one_hot(np.array(batch_outputs, dtype='uint8'))
 
     def generators(self, rnd):
@@ -104,18 +104,23 @@ class DataSet(object):
         nb_examples = {}
         for set_name in ['train', 'test']:
             set_dirname = os.path.join(self.data_dir, set_name)
-            full_sequences = self._load_set(set_dirname)
-            fragment_generators[set_name] = self.select_generator(set_name, full_sequences, rnd)
-            nb_examples[set_name] = int(sum( [len(xrange(0, x.shape[0] - self.fragment_length, self.fragment_stride)) for x in full_sequences]) / self.batch_size) * self.batch_size
+            full_sequences = self._load_set(set_dirname, 'data') # mix waves
+            full_labels = self._load_set(set_dirname, 'label') # vocal waves
+            fragment_generators[set_name] = self.select_generator(set_name, full_sequences, full_labels, rnd)
+            nb_examples[set_name] = int(sum([len(xrange(0, x.shape[0] - self.fragment_length, self.fragment_stride)) for x in full_sequences]) / self.batch_size) * self.batch_size
         return fragment_generators, nb_examples
 
-    def _load_set(self, set_dirname):
+    def _load_set(self, set_dirname, status):
         ulaw_str = '_ulaw' if self.use_ulaw else ''
-        cache_fn = os.path.join(set_dirname, 'processed_%d%s.npy' % (self.sample_rate, ulaw_str))
+        cache_fn = os.path.join(set_dirname, 'processed_%s_%d%s.npy' % (status, self.sample_rate, ulaw_str))
         if os.path.isfile(cache_fn):
             full_sequences = np.load(cache_fn)
         else:
-            file_names = [fn for fn in os.listdir(set_dirname) if fn.endswith('.wav')]
+            files = os.listdir(set_dirname)
+            if status == 'data':
+                file_names = [os.path.join(f, 'mix.wav') for f in files if os.path.isfile(os.path.join(set_dirname, f, 'mix.wav'))]
+            else: # label
+                file_names = [os.path.join(f, 'source-02.wav') for f in files if os.path.isfile(os.path.join(set_dirname, f, 'source-02.wav'))]
             full_sequences = []
             for fn in tqdm(file_names):
                 sequence = self.process_wav(os.path.join(set_dirname, fn))
